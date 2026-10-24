@@ -3,7 +3,6 @@ import createHttpError from "http-errors";
 import { User } from "./userModel.js";
 import bcrypt from "bcrypt";
 
-
 import { config } from "../config/config.js";
 import jwt from "jsonwebtoken";
 import type { IUser } from "./userTypes.js";
@@ -48,14 +47,49 @@ const createUser = async (req: Request, res: Response, next: NextFunction) => {
         expiresIn: "1d",
       },
     );
-    res.json({
+    res.status(201).json({
       accessToken: token,
     });
   } catch (error) {
     return next(createHttpError(500, "Internal server error"));
   }
-
-  // response
 };
 
-export { createUser };
+const loginUser = async (req:Request, res:Response, next:NextFunction) => {
+    const {email,password} = req.body;
+
+    if(!email || !password) {
+        const error = createHttpError(400,"All fields are required");
+        return next(error);
+    }
+
+    try {
+        const user = await User.findOne({email:email});
+        if(!user){
+            const error = createHttpError(404,"User not found");
+            return next(error);
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+
+        if(!isMatch){
+            const error = createHttpError(401,"Invalid credentials");
+            return next(error);
+        }
+
+        const token = jwt.sign({sub:user._id},config.jwtSecret as string,{expiresIn:"1d"});
+
+        res.status(200).json({
+            accessToken:token
+        })
+
+        
+
+    } catch (error) {
+        return next(createHttpError(500,"Internal server error"));
+    }
+
+
+}
+
+export { createUser , loginUser};
